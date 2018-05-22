@@ -7,7 +7,6 @@ from hmmlearn.hmm import GaussianHMM
 from sklearn.model_selection import KFold
 from asl_utils import combine_sequences
 
-
 class ModelSelector(object):
     '''
     base class for model selection (strategy design pattern)
@@ -39,13 +38,14 @@ class ModelSelector(object):
             hmm_model = GaussianHMM(n_components=num_states, covariance_type="diag", n_iter=1000,
                                     random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
             if self.verbose:
-                print("model created for {} with {} states".format(self.this_word, num_states))
+                print("model created for {} with {} states".format(
+                    self.this_word, num_states))
             return hmm_model
         except:
             if self.verbose:
-                print("failure on {} with {} states".format(self.this_word, num_states))
+                print("failure on {} with {} states".format(
+                    self.this_word, num_states))
             return None
-
 
 class SelectorConstant(ModelSelector):
     """ select the model with value self.n_constant
@@ -59,7 +59,6 @@ class SelectorConstant(ModelSelector):
         """
         best_num_components = self.n_constant
         return self.base_model(best_num_components)
-
 
 class SelectorBIC(ModelSelector):
     """ select the model with the lowest Bayesian Information Criterion(BIC) score
@@ -79,7 +78,6 @@ class SelectorBIC(ModelSelector):
         # TODO implement model selection based on BIC scores
         raise NotImplementedError
 
-
 class SelectorDIC(ModelSelector):
     ''' select best model based on Discriminative Information Criterion
 
@@ -95,7 +93,6 @@ class SelectorDIC(ModelSelector):
 
         # TODO implement model selection based on DIC scores
         raise NotImplementedError
-
 
 class SelectorCV(ModelSelector):
     ''' select best model based on average log Likelihood of cross-validation folds
