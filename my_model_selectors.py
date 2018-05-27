@@ -114,15 +114,70 @@ class SelectorDIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        best_num_components = None
+        best_DIC_score = None
+
+        for n in range(self.min_n_components, self.max_n_components + 1):
+            try:
+                
+                log_P_X_i = self.base_model(n).score(self.X, self.lengths)
+                sum_log_P_X_all_but_i = 0.
+                words = list(self.words.keys())
+                M = len(words)
+                words.remove(self.this_word)
+                for word in words:
+                    try:
+                        model_selector_all_but_i = ModelSelector(self.words, self.hwords, word, self.n_constant, self.min_n_components, self.max_n_components, self.random_state, self.verbose)
+                        sum_log_P_X_all_but_i += model_selector_all_but_i.base_model(n).score(model_selector_all_but_i.X, model_selector_all_but_i.lengths)
+                    except:
+                        M = M - 1
+
+                DIC = log_P_X_i - sum_log_P_X_all_but_i / (M - 1)
+
+                if best_DIC_score is None or best_DIC_score < DIC:
+                   best_DIC_score, best_num_components = DIC, n
+            except:
+                pass
+
+        if best_num_components is None:
+            return self.base_model(self.n_constant)
+        else:
+            return self.base_model(best_num_components)
 
 class SelectorCV(ModelSelector):
     ''' select best model based on average log Likelihood of cross-validation folds
 
     '''
-
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection using CV
-        raise NotImplementedError
+        best_num_components = None
+        best_avg_likelihood_log = None
+
+        for n in range(self.min_n_components, self.max_n_components + 1):
+            
+            count_logL = 0
+            sum_logL = 0.
+            
+            try:
+                split_method = KFold(n_splits = 3)
+                for cv_train, cv_test in split_method.split(self.sequences):
+                    X, lengths = combine_sequences(cv_train, self.sequences)
+
+                    try:
+                        sum_logL += self.base_model(n).score(X, lengths)
+                        count_logL += 1
+                    except:
+                        pass
+
+                if count_logL > 0:
+                    avg_logL = sum_logL / count_logL
+                    if best_avg_likelihood_log is None or best_avg_likelihood_log < avg_logL:
+                       best_avg_likelihood_log, best_num_components = avg_logL, n
+            except:
+                pass
+        if best_num_components is None:
+            return self.base_model(self.n_constant)
+        else:
+            return self.base_model(best_num_components)
