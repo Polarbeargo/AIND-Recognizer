@@ -66,17 +66,17 @@ class SelectorBIC(ModelSelector):
     http://www2.imm.dtu.dk/courses/02433/doc/ch6_slides.pdf
     Bayesian information criteria: BIC = -2 * logL + p * logN
     """
-    
+
     def BIC_score(self, n):
-        
+
         model = self.base_model(n)
         logN = np.log(len(self.X))
         d = model.n_features
         logL = model.score(self.X, self.lengths)
         p = n ** 2 + 2 * d * n - 1
-        BIC = -2.0 * logL + p * logN, model
-        
-        return BIC
+        BIC = -2.0 * logL + p * logN
+
+        return BIC, model
 
     def select(self):
         """ select the best model for self.this_word based on
@@ -87,18 +87,18 @@ class SelectorBIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on BIC scores
-        try:
-            best_model = None
-            best_score = float("Inf")
+        best_model = None
+        best_score = float("Inf")
 
-            for n in range(self.min_n_components, self.max_n_components + 1):
+        for n in range(self.min_n_components, self.max_n_components + 1):
+            try:
                 score, model = self.BIC_score(n)
                 if score < best_score:
                     best_score, best_model = score, model
-            return best_model
-        
-        except:
-            return self.base_model(self.n_constant)
+            except Exception as e:
+                continue
+
+        return best_model if best_model is not None else self.base_model(self.n_constant)
 
 class SelectorDIC(ModelSelector):
     ''' select best model based on Discriminative Information Criterion
@@ -109,7 +109,6 @@ class SelectorDIC(ModelSelector):
     https://pdfs.semanticscholar.org/ed3d/7c4a5f607201f3848d4c02dd9ba17c791fc2.pdf
     DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
     '''
-
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -119,23 +118,26 @@ class SelectorDIC(ModelSelector):
 
         for n in range(self.min_n_components, self.max_n_components + 1):
             try:
-                
+
                 log_P_X_i = self.base_model(n).score(self.X, self.lengths)
                 sum_log_P_X_all_but_i = 0.
                 words = list(self.words.keys())
                 M = len(words)
                 words.remove(self.this_word)
                 for word in words:
-                    try:
-                        model_selector_all_but_i = ModelSelector(self.words, self.hwords, word, self.n_constant, self.min_n_components, self.max_n_components, self.random_state, self.verbose)
-                        sum_log_P_X_all_but_i += model_selector_all_but_i.base_model(n).score(model_selector_all_but_i.X, model_selector_all_but_i.lengths)
-                    except:
-                        M = M - 1
+                    if word != self.this_word:
+                        try:
+                            model_selector_all_but_i = ModelSelector(
+                                self.words, self.hwords, word, self.n_constant, self.min_n_components, self.max_n_components, self.random_state, self.verbose)
+                            sum_log_P_X_all_but_i += model_selector_all_but_i.base_model(n).score(
+                                model_selector_all_but_i.X, model_selector_all_but_i.lengths)
+                        except:
+                            M = M - 1
 
                 DIC = log_P_X_i - sum_log_P_X_all_but_i / (M - 1)
 
                 if best_DIC_score is None or best_DIC_score < DIC:
-                   best_DIC_score, best_num_components = DIC, n
+                    best_DIC_score, best_num_components = DIC, n
             except:
                 pass
 
@@ -148,6 +150,7 @@ class SelectorCV(ModelSelector):
     ''' select best model based on average log Likelihood of cross-validation folds
 
     '''
+
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -156,12 +159,12 @@ class SelectorCV(ModelSelector):
         best_avg_likelihood_log = None
 
         for n in range(self.min_n_components, self.max_n_components + 1):
-            
+
             count_logL = 0
             sum_logL = 0.
-            
+
             try:
-                split_method = KFold(n_splits = 3)
+                split_method = KFold(n_splits=3)
                 for cv_train, cv_test in split_method.split(self.sequences):
                     X, lengths = combine_sequences(cv_train, self.sequences)
 
@@ -174,7 +177,7 @@ class SelectorCV(ModelSelector):
                 if count_logL > 0:
                     avg_logL = sum_logL / count_logL
                     if best_avg_likelihood_log is None or best_avg_likelihood_log < avg_logL:
-                       best_avg_likelihood_log, best_num_components = avg_logL, n
+                        best_avg_likelihood_log, best_num_components = avg_logL, n
             except:
                 pass
         if best_num_components is None:
